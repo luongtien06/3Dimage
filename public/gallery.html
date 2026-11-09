@@ -1,0 +1,882 @@
+<!doctype html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Chi tiết bộ sưu tập - Turbo Gallery">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%236366f1'/><text x='50' y='68' font-size='60' font-weight='bold' text-anchor='middle' fill='white' font-family='sans-serif'>T</text></svg>">
+    <title>Chi Tiết Bộ Sưu Tập - Turbo Gallery</title>
+
+    <style>
+        :root {
+            --bg-body: #0b0d12;
+            --bg-card: #131620;
+            --border-color: rgba(255, 255, 255, 0.08);
+            --border-hover: rgba(129, 140, 248, 0.4);
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --accent: #6366f1;
+            --radius-card: 16px;
+            --radius-pill: 999px;
+            --transition-fast: 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+            --transition-smooth: 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html { color-scheme: dark; scroll-behavior: smooth; }
+        body {
+            min-height: 100dvh;
+            background-color: var(--bg-body);
+            color: var(--text-main);
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.5;
+            -webkit-font-smoothing: antialiased;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 0 20px 40px;
+        }
+
+        .site-header {
+            position: sticky;
+            top: 16px;
+            z-index: 100;
+            width: min(100%, 1080px);
+            margin-top: 16px;
+            padding: 12px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: rgba(19, 22, 32, 0.8);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-pill);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+            transform: translateZ(0);
+        }
+
+        .back-btn {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--text-main);
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 0.9rem;
+            transition: color var(--transition-fast);
+        }
+        .back-btn:hover { color: var(--accent); }
+
+        .header-badge {
+            font-size: 0.75rem;
+            font-weight: 600;
+            padding: 5px 12px;
+            border-radius: var(--radius-pill);
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-color);
+            color: var(--text-muted);
+        }
+
+        .hero {
+            width: min(100%, 1080px);
+            padding: 36px 0 24px;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 8px;
+        }
+        .hero h1 { font-size: clamp(1.8rem, 4vw, 2.6rem); font-weight: 800; }
+        .hero p { color: var(--text-muted); font-size: 0.95rem; }
+
+        .gallery-grid {
+            width: min(100%, 1080px);
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: clamp(10px, 1.7vw, 18px);
+        }
+
+        .photo-card {
+            position: relative;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-card);
+            overflow: hidden;
+            aspect-ratio: 1 / 1;
+            cursor: pointer;
+            contain: layout paint;
+            
+            transition: transform var(--transition-fast), border-color var(--transition-fast);
+        }
+        /* Chỉ hover trên thiết bị có chuột (tránh hover "dính" sau khi chạm trên cảm ứng) */
+        @media (hover: hover) {
+            .photo-card:hover { transform: translateY(-4px) translateZ(0); border-color: var(--border-hover); }
+            .photo-card:hover img { transform: scale(1.05) translateZ(0); }
+        }
+
+        .photo-card img {
+            width: 100%; height: 100%; object-fit: cover; display: block; opacity: 0;
+            transition: transform var(--transition-smooth), opacity 0.3s ease;
+        }
+        .photo-card:not(.skeleton) img { opacity: 1; }
+
+        .photo-card.skeleton {
+            background: #181c2a;
+            animation: skeletonPulse 1.2s ease-in-out infinite alternate;
+        }
+        @keyframes skeletonPulse { from { opacity: 0.45; } to { opacity: 0.9; } }
+
+        /* ===== Lightbox ===== */
+        .photo-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+        .lightbox {
+            --pt: 72px; --pb: 28px; --px: 88px;
+            position: fixed; left: 0; top: 0; width: 100%; height: 100%; height: 100dvh;
+            z-index: 1000; visibility: hidden; overscroll-behavior: contain; outline: none;
+            -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none;
+        }
+        .lightbox.active { visibility: visible; }
+        .lb-backdrop { position: absolute; inset: 0; background: rgba(6, 8, 13, 0.9); }
+        .lb-surface { position: absolute; inset: 0; overflow: hidden; touch-action: none; }
+        .lb-surface.zoomed { cursor: grab; }
+        .lb-surface.zoomed:active { cursor: grabbing; }
+        /* Vùng an toàn: ảnh luôn nằm gọn trong đây, không đè lên nút/thanh công cụ */
+        .lb-stage {
+            position: absolute;
+            left: calc(env(safe-area-inset-left, 0px) + var(--px));
+            right: calc(env(safe-area-inset-right, 0px) + var(--px));
+            top: calc(env(safe-area-inset-top, 0px) + var(--pt));
+            bottom: calc(env(safe-area-inset-bottom, 0px) + var(--pb));
+        }
+        .lb-slide { position: absolute; inset: 0; margin: auto; border-radius: 10px; pointer-events: none; will-change: transform, opacity; }
+        .lb-img { display: block; width: 100%; height: 100%; object-fit: contain; border-radius: 10px; -webkit-user-drag: none; will-change: transform; transform-origin: 50% 50%; }
+
+        .lb-ui { opacity: 0; transition: opacity 0.25s ease; }
+        .lightbox.active:not(.closing) .lb-ui { opacity: 1; }
+        .lb-topbar {
+            position: absolute; display: flex; align-items: center; justify-content: space-between;
+            left: calc(env(safe-area-inset-left, 0px) + 14px); right: calc(env(safe-area-inset-right, 0px) + 14px);
+            top: calc(env(safe-area-inset-top, 0px) + 12px); pointer-events: none;
+        }
+        .lb-topbar > * { pointer-events: auto; }
+        .lb-tools { display: flex; gap: 6px; }
+        .lb-pill {
+            height: 36px; padding: 0 14px; display: flex; align-items: center; border-radius: var(--radius-pill);
+            background: rgba(20, 24, 34, 0.75); border: 1px solid rgba(255, 255, 255, 0.14);
+            color: #e2e8f0; font-size: 0.8rem; font-weight: 600; font-variant-numeric: tabular-nums;
+        }
+        .lb-btn {
+            width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; cursor: pointer;
+            background: rgba(20, 24, 34, 0.75); border: 1px solid rgba(255, 255, 255, 0.16); color: #fff;
+            transition: background var(--transition-fast), transform var(--transition-fast);
+        }
+        .lb-btn:hover { background: rgba(255, 255, 255, 0.22); }
+        .lb-btn:active { transform: scale(0.93); }
+        .lb-btn:focus-visible { outline: 2px solid #a5b4fc; outline-offset: 2px; }
+        .lb-btn svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+        .lb-zoom-label { width: auto; min-width: 58px; padding: 0 10px; border-radius: var(--radius-pill); font-size: 0.78rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+        .lb-speed {
+            -webkit-appearance: none; appearance: none; height: 44px; min-width: 64px; padding: 0 28px 0 14px;
+            border-radius: var(--radius-pill); cursor: pointer; color: #fff;
+            font-family: inherit; font-size: 0.78rem; font-weight: 600; font-variant-numeric: tabular-nums;
+            background: rgba(20, 24, 34, 0.75) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") no-repeat right 10px center / 12px;
+            border: 1px solid rgba(255, 255, 255, 0.16);
+            transition: background-color var(--transition-fast);
+        }
+        .lb-speed:hover { background-color: rgba(255, 255, 255, 0.22); }
+        .lb-speed:focus-visible { outline: 2px solid #a5b4fc; outline-offset: 2px; }
+        .lb-prev, .lb-next { position: absolute; top: 50%; margin-top: -22px; }
+        .lb-prev { left: calc(env(safe-area-inset-left, 0px) + 22px); }
+        .lb-next { right: calc(env(safe-area-inset-right, 0px) + 22px); }
+        .lb-progress { position: absolute; left: 0; top: 0; width: 100%; height: 3px; background: linear-gradient(90deg, #818cf8, #6366f1); transform-origin: 0 50%; transform: scaleX(0); pointer-events: none; }
+        .lb-spinner {
+            position: absolute; left: 50%; top: 50%; width: 36px; height: 36px; margin: -18px 0 0 -18px;
+            border: 3px solid rgba(255, 255, 255, 0.2); border-top-color: #fff; border-radius: 50%;
+            opacity: 0; pointer-events: none; transition: opacity 0.2s;
+        }
+        .lb-spinner.show { opacity: 1; animation: lbSpin 0.8s linear infinite; }
+        @keyframes lbSpin { to { transform: rotate(360deg); } }
+
+        @media (max-width: 1024px) { .gallery-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+        @media (max-width: 680px) { .gallery-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+        /* Điện thoại dọc: nút trước/sau chuyển xuống thanh dưới, ảnh dùng gần hết bề ngang */
+        @media (max-width: 719px) {
+            .lightbox { --px: 8px; --pt: 68px; --pb: 84px; }
+            .lb-prev, .lb-next { top: auto; margin: 0; bottom: calc(env(safe-area-inset-bottom, 0px) + 20px); left: 50%; right: auto; }
+            .lb-prev { margin-left: -58px; }
+            .lb-next { margin-left: 14px; }
+            #lbZoomIn, #lbZoomOut { display: none; } /* điện thoại dùng pinch / nhấp đúp */
+        }
+        @media (max-height: 520px) { .lightbox { --pt: 60px; } }
+        @media (max-height: 520px) and (max-width: 719px) { .lightbox { --pb: 76px; } }
+    </style>
+</head>
+<body>
+
+    <header class="site-header">
+        <a href="index.html" class="back-btn" aria-label="Quay lại trang chủ">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+            Về trang chủ
+        </a>
+        <div class="header-badge" id="badgeCount">0 Ảnh</div>
+    </header>
+
+    <section class="hero">
+        <h1 id="galleryTitle">Bộ sưu tập</h1>
+        <p id="gallerySubtitle">Danh sách hình ảnh chi tiết</p>
+    </section>
+
+    <main class="gallery-grid" id="photoGrid"></main>
+
+    <!-- Lightbox Xem Ảnh Lớn -->
+    <div class="lightbox" id="lightbox" tabindex="-1" aria-hidden="true" role="dialog" aria-modal="true" aria-label="Xem ảnh lớn">
+        <div class="lb-backdrop" id="lbBackdrop"></div>
+        <div class="lb-surface" id="lbSurface"><div class="lb-stage" id="lbStage"></div></div>
+        <div class="lb-spinner" id="lbSpinner" aria-hidden="true"></div>
+        <div class="lb-progress" id="lbProgress" aria-hidden="true"></div>
+        <div class="lb-ui lb-topbar">
+            <div class="lb-pill" id="lbCounter" aria-live="polite">1 / 1</div>
+            <div class="lb-tools">
+                <button class="lb-btn" id="lbPlay" aria-label="Tự động chuyển ảnh" aria-pressed="false"></button>
+                <select class="lb-speed" id="lbSpeed" aria-label="Thời gian hiển thị mỗi ảnh" title="Thời gian mỗi ảnh">
+                    <option value="2">2s</option><option value="3">3s</option><option value="4">4s</option><option value="6">6s</option><option value="10">10s</option>
+                </select>
+                <button class="lb-btn" id="lbZoomOut" aria-label="Thu nhỏ"><svg viewBox="0 0 24 24"><path d="M5 12h14"/></svg></button>
+                <button class="lb-btn lb-zoom-label" id="lbZoomLabel" aria-label="Đặt lại vừa khung">100%</button>
+                <button class="lb-btn" id="lbZoomIn" aria-label="Phóng to"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
+                <button class="lb-btn" id="lbClose" aria-label="Đóng xem ảnh"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+            </div>
+        </div>
+        <button class="lb-btn lb-ui lb-prev" id="lbPrev" aria-label="Ảnh trước"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
+        <button class="lb-btn lb-ui lb-next" id="lbNext" aria-label="Ảnh sau"><svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg></button>
+    </div>
+
+    
+<template id="photoTemplate">
+        <div class="photo-card skeleton">
+            <img width="400" height="400" decoding="async" alt="" />
+        </div>
+    </template>
+
+    <script src="galleries.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const params = new URLSearchParams(window.location.search);
+            const galleries = Array.isArray(window.TURBO_GALLERIES) ? window.TURBO_GALLERIES : [];
+            const requestedFolder = params.get('folder') || '';
+            const gallery = galleries.find((item) => item && item.folder === requestedFolder);
+            const folder = gallery ? gallery.folder : '';
+            const count = gallery && Number.isSafeInteger(gallery.count) && gallery.count > 0 ? gallery.count : 0;
+            const assetVersion = gallery && typeof gallery.version === 'string' ? gallery.version : '';
+
+            const ASSET_ROOT = 'assets';
+            const versioned = (path) => assetVersion ? path + '?v=' + encodeURIComponent(assetVersion) : path;
+            const thumbSrc = (i) => versioned(`${ASSET_ROOT}/${folder}/thumbs/${i}.webp`);
+            const origSrc = (i) => versioned(`${ASSET_ROOT}/${folder}/medium/${i}.webp`);
+
+            document.getElementById('galleryTitle').textContent = folder ? `Bộ Sưu Tập ${folder.toUpperCase()}` : 'Không tìm thấy bộ sưu tập';
+            document.getElementById('gallerySubtitle').textContent = count ? `Hiển thị ${count} tác phẩm nghệ thuật kỹ thuật số` : 'Chưa có ảnh nào trong bộ sưu tập này';
+            document.getElementById('badgeCount').textContent = `${count} Ảnh`;
+
+            const photoGrid = document.getElementById('photoGrid');
+            const template = document.getElementById('photoTemplate');
+            const lightbox = document.getElementById('lightbox');
+            const lbCounter = document.getElementById('lbCounter');
+            const cards = [];
+            const started = new Array(count).fill(false);
+
+            const FALLBACK_SVG = 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(
+                `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400"><rect width="100%" height="100%" fill="#131620"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="#94a3b8" font-family="sans-serif">IMAGE NOT FOUND</text></svg>`
+            );
+
+            // Dựng toàn bộ thẻ cố định aspect-ratio để không layout shift
+            const fragment = document.createDocumentFragment();
+            for (let i = 1; i <= count; i++) {
+                const clone = template.content.cloneNode(true);
+                const card = clone.querySelector('.photo-card');
+                const img = clone.querySelector('img');
+                img.alt = `Tác phẩm ${i} thuộc ${folder}`;
+                if (i <= 4) {
+                    img.fetchPriority = (i <= 2) ? 'high' : 'auto';
+                    img.loading = 'eager';
+                } else {
+                    img.loading = 'lazy';
+                    img.fetchPriority = 'low';
+                }
+                card.dataset.i = i - 1;
+                card.tabIndex = 0;
+                card.setAttribute('role', 'button');
+                card.setAttribute('aria-label', `Xem ảnh ${i}`);
+                cards.push(card);
+                fragment.appendChild(clone);
+            }
+            photoGrid.appendChild(fragment);
+
+            // Event delegation tối ưu cho cả lưới ảnh
+            photoGrid.addEventListener('click', (e) => {
+                const card = e.target.closest('.photo-card');
+                if (card) openLightbox(+card.dataset.i);
+            });
+            photoGrid.addEventListener('keydown', (e) => {
+                if ((e.key === 'Enter' || e.key === ' ') && e.target.classList && e.target.classList.contains('photo-card')) {
+                    e.preventDefault(); openLightbox(+e.target.dataset.i);
+                }
+            });
+
+            function startCard(idx) {
+                if (started[idx]) return;
+                started[idx] = true;
+                const card = cards[idx];
+                const img = card.querySelector('img');
+
+                const done = () => {
+                    card.classList.remove('skeleton');
+                    img.onload = img.onerror = null;
+                };
+
+                img.onload = done;
+                img.onerror = () => {
+                    img.onerror = () => { card.classList.remove('skeleton'); };
+                    img.src = FALLBACK_SVG;
+                };
+                img.src = thumbSrc(idx + 1);
+                if (img.complete && img.naturalWidth > 0) done();
+            }
+
+            // IntersectionObserver kích hoạt nạp trước 400px vùng nhìn thấy
+            const io = 'IntersectionObserver' in window ? new IntersectionObserver((entries) => {
+                for (const en of entries) {
+                    if (en.isIntersecting) {
+                        io.unobserve(en.target);
+                        startCard(+en.target.dataset.i);
+                    }
+                }
+            }, { rootMargin: '400px 0px' }) : null;
+
+            // Kích hoạt ngay 8 ảnh đầu, còn lại qua io
+            for (let i = 0; i < count; i++) {
+                if (i < 8 || !io) startCard(i);
+                else io.observe(cards[i]);
+            }
+
+            // ===== Lightbox =====
+            const $ = (id) => document.getElementById(id);
+            const backdrop = $('lbBackdrop'), surface = $('lbSurface'), stage = $('lbStage');
+            const spinner = $('lbSpinner'), zoomLbl = $('lbZoomLabel');
+            const reduceMq = matchMedia('(prefers-reduced-motion: reduce)');
+            const dur = (ms) => (reduceMq.matches ? 0 : ms);
+            const EASE = 'cubic-bezier(.22,1,.36,1)', EASE2 = 'cubic-bezier(.32,.72,0,1)';
+            const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+            const getLoopIndex = (idx) => ((idx % count) + count) % count;
+
+            const metaStore = new Map();
+            let state = 'closed', current = 0, navIndex = 0, navToken = 0, slide = null;
+            let view = { z: 1, x: 0, y: 0 }, lastFocus = null, spinTimer = 0, scrollY0 = 0;
+            const playBtn = $('lbPlay'), progress = $('lbProgress'), speedSel = $('lbSpeed');
+            const ICON_PLAY = '<svg viewBox="0 0 24 24"><path d="M8 5l11 7-11 7z"/></svg>', ICON_PAUSE = '<svg viewBox="0 0 24 24"><path d="M9 5v14M15 5v14"/></svg>';
+            let playing = false, autoTimer = 0, autoAnim = null, lastZ = false, autoMs = 4000;
+
+            try {
+                const sv = parseFloat(localStorage.getItem('lbSpeed'));
+                if ([2, 3, 4, 6, 10].includes(sv)) autoMs = sv * 1000;
+            } catch (_) {}
+            speedSel.value = String(autoMs / 1000);
+
+            function stopAuto() {
+                clearTimeout(autoTimer);
+                if (autoAnim) { autoAnim.cancel(); autoAnim = null; }
+            }
+
+            function schedule() {
+                stopAuto();
+                if (!playing || state !== 'open' || !slide || slide.index !== navIndex || view.z > 1 || document.hidden) return;
+                const ms = autoMs;
+                autoAnim = progress.animate([{ transform: 'scaleX(0)' }, { transform: 'scaleX(1)' }], { duration: ms, easing: 'linear' });
+                autoTimer = setTimeout(() => goTo(navIndex + 1, 1), ms);
+            }
+
+            function setPlaying(v) {
+                playing = v;
+                playBtn.innerHTML = v ? ICON_PAUSE : ICON_PLAY;
+                playBtn.setAttribute('aria-pressed', v);
+                playBtn.setAttribute('aria-label', v ? 'Dừng tự động chuyển' : 'Tự động chuyển ảnh');
+                lbCounter.setAttribute('aria-live', v ? 'off' : 'polite');
+                if (v && view.z > 1) zoomAt(1, 0, 0, true);
+                schedule();
+            }
+
+            playBtn.innerHTML = ICON_PLAY;
+            if (count < 2) { playBtn.hidden = true; speedSel.hidden = true; }
+            playBtn.addEventListener('click', () => setPlaying(!playing));
+            speedSel.addEventListener('change', () => {
+                autoMs = (+speedSel.value || 4) * 1000;
+                try { localStorage.setItem('lbSpeed', speedSel.value); } catch (_) {}
+                schedule();
+            });
+            document.addEventListener('visibilitychange', schedule);
+            window.addEventListener('pagehide', () => { stopAuto(); playing = false; });
+
+            // Lấy kích thước và nguồn ảnh nhanh từ card đang hiển thị
+            function getCardInfo(i) {
+                const c = cards[i];
+                const im = c ? c.querySelector('img') : null;
+                const loaded = im && im.complete && im.naturalWidth > 0;
+                return {
+                    src: origSrc(i + 1),
+                    thumb: (loaded && im.currentSrc) ? im.currentSrc : thumbSrc(i + 1),
+                    w: loaded ? im.naturalWidth : 800,
+                    h: loaded ? im.naturalHeight : 600,
+                    ready: loaded
+                };
+            }
+
+            function getMeta(i) {
+                if (metaStore.has(i)) return metaStore.get(i);
+                const cardInfo = getCardInfo(i);
+                const m = {
+                    src: cardInfo.src,
+                    thumb: cardInfo.thumb,
+                    w: cardInfo.w,
+                    h: cardInfo.h,
+                    highLoaded: false
+                };
+                metaStore.set(i, m);
+                if (metaStore.size > 40) {
+                    const first = metaStore.keys().next().value;
+                    metaStore.delete(first);
+                }
+                return m;
+            }
+
+            function preloadAdjacent(idx, dir = 1) {
+                const nextIdx = getLoopIndex(idx + dir);
+                const prevIdx = getLoopIndex(idx - dir);
+                const tNext = new Image(); tNext.decoding = 'async'; tNext.src = thumbSrc(nextIdx + 1);
+                if (!playing) {
+                    const tPrev = new Image(); tPrev.decoding = 'async'; tPrev.src = thumbSrc(prevIdx + 1);
+                }
+            }
+
+            const stageSize = () => ({ w: stage.clientWidth, h: stage.clientHeight });
+            const rel = (x, y) => {
+                const r = stage.getBoundingClientRect();
+                return [x - (r.left + r.width / 2), y - (r.top + r.height / 2)];
+            };
+
+            function sizeSlide(s) {
+                const { w, h } = stageSize();
+                if (!w || !h) return;
+                const f = Math.min(w / s.meta.w, h / s.meta.h);
+                s.W = s.meta.w * f;
+                s.H = s.meta.h * f;
+                s.el.style.width = s.W + 'px';
+                s.el.style.height = s.H + 'px';
+                s.maxZ = clamp((s.meta.w / s.W) * 1.5, 3, 8);
+            }
+
+            function makeSlide(i, meta) {
+                const el = document.createElement('div');
+                el.className = 'lb-slide';
+                const img = new Image();
+                img.className = 'lb-img';
+                img.draggable = false;
+                img.alt = `Tác phẩm ${i + 1} thuộc ${folder}`;
+                img.decoding = 'async';
+                // Dùng ảnh đã có ngay lập tức (thumbnail hoặc high-res nếu đã tải)
+                img.src = meta.highLoaded ? meta.src : (meta.thumb || meta.src);
+                el.appendChild(img);
+
+                const s = { el, img, meta, index: i, W: 1, H: 1, maxZ: 3, anim: null };
+                sizeSlide(s);
+
+                // Tải ngầm ảnh gốc chất lượng cao và cập nhật mượt mà
+                if (!meta.highLoaded) {
+                    const high = new Image();
+                    high.decoding = 'async';
+                    high.onload = () => {
+                        meta.highLoaded = true;
+                        meta.w = high.naturalWidth || meta.w;
+                        meta.h = high.naturalHeight || meta.h;
+                        if (slide && slide.index === i) {
+                            s.img.src = high.src;
+                            sizeSlide(s);
+                            applyView(false);
+                        }
+                    };
+                    high.src = meta.src;
+                }
+
+                return s;
+            }
+
+            function applyView(animate) {
+                if (!slide) return;
+                const { w, h } = stageSize();
+                const mx = Math.max(0, (slide.W * view.z - w) / 2), my = Math.max(0, (slide.H * view.z - h) / 2);
+                view.x = clamp(view.x, -mx, mx); view.y = clamp(view.y, -my, my);
+                const im = slide.img;
+                im.style.transition = animate && !reduceMq.matches ? `transform 280ms ${EASE}` : 'none';
+                im.style.transform = view.z === 1 && !view.x && !view.y ? '' : `translate3d(${view.x}px,${view.y}px,0) scale(${view.z})`;
+                zoomLbl.textContent = Math.round(view.z * 100) + '%';
+                surface.classList.toggle('zoomed', view.z > 1);
+                if ((view.z > 1) !== lastZ) { lastZ = view.z > 1; schedule(); }
+            }
+
+            function zoomAt(z2, px = 0, py = 0, animate = false) {
+                if (!slide) return;
+                z2 = clamp(z2, 1, slide.maxZ);
+                const r = z2 / view.z;
+                view.x = px - (px - view.x) * r; view.y = py - (py - view.y) * r; view.z = z2;
+                if (z2 === 1) { view.x = 0; view.y = 0; }
+                applyView(animate);
+            }
+
+            function zoomTarget() {
+                const { w, h } = stageSize();
+                return Math.min(slide.maxZ, Math.max(2, w / slide.W, h / slide.H));
+            }
+
+            function lockScroll() {
+                scrollY0 = window.scrollY;
+                const sbw = window.innerWidth - document.documentElement.clientWidth, b = document.body.style;
+                b.position = 'fixed'; b.top = `-${scrollY0}px`; b.left = '0'; b.right = '0';
+                if (sbw > 0) b.paddingRight = `${20 + sbw}px`;
+            }
+
+            function unlockScroll() {
+                const b = document.body.style, h = document.documentElement.style;
+                b.position = b.top = b.left = b.right = b.paddingRight = '';
+                h.scrollBehavior = 'auto'; window.scrollTo(0, scrollY0); h.scrollBehavior = '';
+            }
+
+            function thumbRect(i) {
+                const im = cards[i] && cards[i].querySelector('img');
+                if (!im) return null;
+                const r = im.getBoundingClientRect();
+                return r.width > 2 && r.height > 2 ? r : null;
+            }
+
+            function rectVisible(r) {
+                const ix = Math.min(r.right, innerWidth) - Math.max(r.left, 0), iy = Math.min(r.bottom, innerHeight) - Math.max(r.top, 0);
+                return ix > 0 && iy > 0 && (ix * iy) / (r.width * r.height) > 0.4;
+            }
+
+            function flipFrames(s, r) {
+                const sr = stage.getBoundingClientRect();
+                const k = Math.max(r.width / s.meta.w, r.height / s.meta.h) / (s.W / s.meta.w);
+                const dx = r.left + r.width / 2 - (sr.left + sr.width / 2), dy = r.top + r.height / 2 - (sr.top + sr.height / 2);
+                const hi = Math.max(0, (s.W - r.width / k) / 2), vi = Math.max(0, (s.H - r.height / k) / 2);
+                return { transform: `translate3d(${dx}px,${dy}px,0) scale(${k})`, clipPath: `inset(${vi}px ${hi}px round ${16 / k}px)` };
+            }
+
+            const FULL = { transform: 'none', clipPath: 'inset(0px round 10px)' };
+
+            function updateUI() { lbCounter.textContent = `${current + 1} / ${count}`; }
+
+            function snapBack(el) {
+                const from = el.style.transform || 'none';
+                el.style.transform = '';
+                return el.animate([{ transform: from }, { transform: 'none' }], { duration: dur(280), easing: EASE });
+            }
+
+            function leave(s, dir, sh) {
+                if (s.anim) { try { s.anim.commitStyles(); } catch (e) {} s.anim.cancel(); s.anim = null; }
+                const a = s.el.animate({ transform: `translate3d(${-dir * sh}px,0,0)`, opacity: 0 }, { duration: dur(300), easing: EASE, fill: 'forwards' });
+                a.onfinish = () => { if (s.el && s.el.parentNode) s.el.remove(); };
+            }
+
+            // Chuyển ảnh tức thì, mượt mà và không giật lag
+            function goTo(target, dir = 1) {
+                if (state !== 'open') return;
+                const i = getLoopIndex(target);
+                if (slide && i === navIndex && slide.index === i) {
+                    if (slide.el.style.transform) snapBack(slide.el);
+                    return;
+                }
+
+                navIndex = i;
+                lbCounter.textContent = `${i + 1} / ${count}`;
+                const token = ++navToken;
+
+                if (slide && slide.el.style.transform) snapBack(slide.el);
+
+                // Loại bỏ bất kỳ slide cũ nào còn lại ngoài slide hiện tại
+                stage.querySelectorAll('.lb-slide').forEach((el) => {
+                    if (!slide || el !== slide.el) {
+                        el.getAnimations().forEach((a) => a.cancel());
+                        el.remove();
+                    }
+                });
+
+                const meta = getMeta(i);
+                const next = makeSlide(i, meta);
+                const prev = slide;
+                slide = next;
+                current = i;
+                view = { z: 1, x: 0, y: 0 };
+
+                stage.appendChild(next.el);
+                sizeSlide(next);
+                applyView(false);
+                updateUI();
+                preloadAdjacent(i, dir);
+
+                const sh = Math.round(Math.min(72, stage.clientWidth * 0.14));
+                if (prev) leave(prev, dir, sh);
+
+                next.anim = next.el.animate([
+                    { transform: `translate3d(${dir * sh}px,0,0)`, opacity: 0 },
+                    { transform: 'translate3d(0,0,0)', opacity: 1 }
+                ], { duration: dur(320), easing: EASE, fill: 'backwards' });
+
+                next.anim.onfinish = () => {
+                    next.anim = null;
+                    if (prev && prev.el && prev.el.parentNode) prev.el.remove();
+                };
+
+                schedule();
+            }
+
+            // Mở Lightbox tức thì (0ms trễ, hiệu ứng FLIP trực tiếp từ card)
+            function openLightbox(index) {
+                if (state !== 'closed') return;
+                state = 'opening';
+                lastFocus = document.activeElement;
+                lockScroll();
+                lightbox.classList.add('active');
+                lightbox.setAttribute('aria-hidden', 'false');
+
+                backdrop.animate([{ opacity: 0 }, { opacity: 1 }], { duration: dur(280), easing: 'ease-out' });
+
+                navIndex = current = index;
+                const token = ++navToken;
+
+                const meta = getMeta(index);
+                const s = makeSlide(index, meta);
+                slide = s;
+                view = { z: 1, x: 0, y: 0 };
+
+                stage.appendChild(s.el);
+                sizeSlide(s);
+                applyView(false);
+                updateUI();
+                preloadAdjacent(index, 1);
+
+                state = 'open';
+
+                const r = thumbRect(index);
+                s.anim = r && !reduceMq.matches
+                    ? s.el.animate([flipFrames(s, r), FULL], { duration: 380, easing: EASE, fill: 'backwards' })
+                    : s.el.animate([{ opacity: 0, transform: 'scale(.94)' }, { opacity: 1, transform: 'none' }], { duration: dur(260), easing: EASE, fill: 'backwards' });
+                s.anim.onfinish = () => { s.anim = null; };
+
+                schedule();
+                lightbox.focus({ preventScroll: true });
+            }
+
+            async function closeLightbox(dismiss = 0) {
+                if (state !== 'open' && state !== 'opening') return;
+                state = 'closing';
+                navToken++;
+                setPlaying(false);
+                clearTimeout(spinTimer);
+                spinner.classList.remove('show');
+                lightbox.classList.add('closing');
+                lightbox.setAttribute('aria-hidden', 'true');
+
+                const s = slide, jobs = [];
+                stage.querySelectorAll('.lb-slide').forEach((el) => {
+                    if (!s || el !== s.el) {
+                        el.getAnimations().forEach((a) => a.cancel());
+                        el.remove();
+                    }
+                });
+
+                jobs.push(backdrop.animate([{ opacity: getComputedStyle(backdrop).opacity }, { opacity: 0 }], { duration: dur(280), easing: 'ease-out', fill: 'forwards' }).finished);
+
+                const r = thumbRect(current), visible = !!r && rectVisible(r);
+                if (s) {
+                    if (s.anim) { s.anim.finish(); s.anim = null; }
+                    if (visible && view.z === 1 && !dismiss && !reduceMq.matches) {
+                        s.el.style.transform = '';
+                        jobs.push(s.el.animate([FULL, flipFrames(s, r)], { duration: 320, easing: EASE2, fill: 'forwards' }).finished);
+                    } else {
+                        const to = dismiss ? `translate3d(0,${dismiss * 160}px,0) scale(.9)` : 'scale(.94)';
+                        jobs.push(s.el.animate({ transform: to, opacity: 0 }, { duration: dur(240), easing: EASE, fill: 'forwards' }).finished);
+                    }
+                }
+
+                await Promise.all(jobs.map((p) => p.catch(() => {})));
+                if (s && s.el) s.el.remove();
+                slide = null;
+                backdrop.getAnimations().forEach((a) => a.cancel());
+                backdrop.style.opacity = '';
+                lightbox.classList.remove('active', 'closing');
+                unlockScroll();
+                const card = cards[current];
+                if (card && !visible) card.scrollIntoView({ block: 'center', behavior: 'instant' });
+                (card || lastFocus || document.body).focus({ preventScroll: true });
+                state = 'closed';
+            }
+
+            const showPrev = () => goTo(navIndex - 1, -1);
+            const showNext = () => goTo(navIndex + 1, 1);
+            $('lbClose').addEventListener('click', () => closeLightbox());
+            $('lbPrev').addEventListener('click', showPrev);
+            $('lbNext').addEventListener('click', showNext);
+            $('lbZoomIn').addEventListener('click', () => zoomAt(view.z * 1.6, 0, 0, true));
+            $('lbZoomOut').addEventListener('click', () => zoomAt(view.z / 1.6, 0, 0, true));
+            zoomLbl.addEventListener('click', () => zoomAt(1, 0, 0, true));
+
+            // Cử chỉ: vuốt ngang đổi ảnh (bám theo ngón tay), vuốt dọc đóng, pinch/cuộn chuột/nhấp đúp zoom, kéo di chuyển
+            const ptrs = new Map();
+            let g = null, pinch = null, lastTap = { t: 0, x: 0, y: 0 };
+
+            surface.addEventListener('pointerdown', (e) => {
+                if (state !== 'open' || !slide || (e.pointerType === 'mouse' && e.button !== 0)) return;
+                try { surface.setPointerCapture(e.pointerId); } catch (_) {}
+                ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+                stopAuto();
+                if (ptrs.size === 2) {
+                    if (g && (g.mode === 'swipe' || g.mode === 'vswipe')) { slide.el.style.transform = ''; backdrop.style.opacity = ''; }
+                    const [a, b] = [...ptrs.values()];
+                    pinch = { d0: Math.hypot(a.x - b.x, a.y - b.y) || 1, z0: view.z, m0: rel((a.x + b.x) / 2, (a.y + b.y) / 2), x0: view.x, y0: view.y };
+                    g = { mode: 'pinch' };
+                } else if (ptrs.size === 1) {
+                    const t = performance.now();
+                    g = { x0: e.clientX, y0: e.clientY, mode: null, dx: 0, dy: 0, s: [{ x: e.clientX, y: e.clientY, t }], vx0: view.x, vy0: view.y };
+                }
+            });
+
+            surface.addEventListener('pointermove', (e) => {
+                const p = ptrs.get(e.pointerId);
+                if (!p || !slide || !g) return;
+                p.x = e.clientX; p.y = e.clientY;
+                if (g.mode === 'pinch') {
+                    if (ptrs.size < 2) return;
+                    const [a, b] = [...ptrs.values()];
+                    const z = clamp(pinch.z0 * (Math.hypot(a.x - b.x, a.y - b.y) || 1) / pinch.d0, 1, slide.maxZ);
+                    const m = rel((a.x + b.x) / 2, (a.y + b.y) / 2);
+                    const r = z / pinch.z0;
+                    view.z = z; view.x = m[0] - (pinch.m0[0] - pinch.x0) * r; view.y = m[1] - (pinch.m0[1] - pinch.y0) * r;
+                    if (z === 1) { view.x = 0; view.y = 0; }
+                    applyView(false);
+                    return;
+                }
+                if (g.mode === 'ignore') return;
+                const dx = e.clientX - g.x0, dy = e.clientY - g.y0, now = performance.now();
+                g.dx = dx; g.dy = dy;
+                g.s.push({ x: e.clientX, y: e.clientY, t: now });
+                while (g.s.length > 2 && now - g.s[0].t > 100) g.s.shift();
+                if (!g.mode && Math.hypot(dx, dy) > 8) g.mode = view.z > 1 ? 'pan' : (Math.abs(dx) >= Math.abs(dy) ? 'swipe' : 'vswipe');
+                if (g.mode === 'pan') { view.x = g.vx0 + dx; view.y = g.vy0 + dy; applyView(false); }
+                else if (g.mode === 'swipe') slide.el.style.transform = `translate3d(${dx}px,0,0)`;
+                else if (g.mode === 'vswipe') {
+                    const k = Math.min(Math.abs(dy) / 500, 0.5);
+                    slide.el.style.transform = `translate3d(${dx * 0.3}px,${dy}px,0) scale(${1 - k * 0.3})`;
+                    backdrop.style.opacity = 1 - k;
+                }
+            });
+
+            function resetDrag() {
+                if (!slide) return;
+                snapBack(slide.el);
+                if (backdrop.style.opacity) {
+                    backdrop.animate([{ opacity: backdrop.style.opacity }, { opacity: 1 }], { duration: dur(250) });
+                    backdrop.style.opacity = '';
+                }
+            }
+
+            function endPtr(e) {
+                if (!ptrs.delete(e.pointerId)) return;
+                try { surface.releasePointerCapture(e.pointerId); } catch (_) {}
+                if (!slide || !g) return;
+                if (g.mode === 'pinch') {
+                    if (ptrs.size === 1) {
+                        const q = [...ptrs.values()][0];
+                        g = { x0: q.x, y0: q.y, mode: view.z > 1 ? 'pan' : 'ignore', dx: 0, dy: 0, s: [{ x: q.x, y: q.y, t: performance.now() }], vx0: view.x, vy0: view.y };
+                    } else if (!ptrs.size) g = null;
+                    return;
+                }
+                if (ptrs.size) return;
+                const gg = g; g = null;
+                if (e.type === 'pointercancel') { if (gg.mode === 'swipe' || gg.mode === 'vswipe') resetDrag(); return; }
+                const a = gg.s[0], b = gg.s[gg.s.length - 1], dt = Math.max(1, b.t - a.t);
+                const vx = (b.x - a.x) / dt, vy = (b.y - a.y) / dt;
+                if (gg.mode === 'swipe') {
+                    if (Math.abs(gg.dx) > Math.min(90, stage.clientWidth * 0.2) || (Math.abs(vx) > 0.5 && Math.abs(gg.dx) > 20)) {
+                        goTo(navIndex + (gg.dx < 0 ? 1 : -1), gg.dx < 0 ? 1 : -1);
+                    } else snapBack(slide.el);
+                } else if (gg.mode === 'vswipe') {
+                    if (Math.abs(gg.dy) > 110 || (Math.abs(vy) > 0.6 && Math.abs(gg.dy) > 30)) closeLightbox(gg.dy < 0 ? -1 : 1);
+                    else resetDrag();
+                } else if (!gg.mode) {
+                    const r = slide.img.getBoundingClientRect(), now = performance.now();
+                    if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) {
+                        closeLightbox();
+                        return;
+                    }
+                    if (now - lastTap.t < 300 && Math.hypot(e.clientX - lastTap.x, e.clientY - lastTap.y) < 30) {
+                        lastTap.t = 0;
+                        const [px, py] = rel(e.clientX, e.clientY);
+                        if (view.z > 1) zoomAt(1, 0, 0, true);
+                        else zoomAt(zoomTarget(), px, py, true);
+                    } else lastTap = { t: now, x: e.clientX, y: e.clientY };
+                }
+            }
+
+            surface.addEventListener('pointerup', endPtr);
+            surface.addEventListener('pointercancel', endPtr);
+            surface.addEventListener('pointerup', schedule);
+            surface.addEventListener('pointercancel', schedule);
+            surface.addEventListener('wheel', (e) => {
+                if (state !== 'open' || !slide) return;
+                e.preventDefault();
+                const [px, py] = rel(e.clientX, e.clientY);
+                zoomAt(view.z * Math.exp(-e.deltaY * (e.deltaMode === 1 ? 16 : 1) * (e.ctrlKey ? 0.012 : 0.002)), px, py, false);
+            }, { passive: false });
+
+            let rq = 0;
+            const relayout = () => {
+                cancelAnimationFrame(rq);
+                rq = requestAnimationFrame(() => {
+                    if (slide) { sizeSlide(slide); applyView(false); }
+                });
+            };
+            if (window.ResizeObserver) new ResizeObserver(relayout).observe(stage);
+            window.addEventListener('resize', relayout);
+            window.addEventListener('orientationchange', relayout);
+
+            // Phím tắt bàn phím
+            document.addEventListener('keydown', (e) => {
+                if (state === 'closed' || state === 'closing') return;
+                if (e.key === 'Tab') {
+                    const f = [...lightbox.querySelectorAll('button, select')].filter((b) => !b.hidden && b.offsetParent !== null);
+                    if (!f.length) return;
+                    if (!lightbox.contains(document.activeElement)) { e.preventDefault(); f[0].focus(); }
+                    else if (e.shiftKey && document.activeElement === f[0]) { e.preventDefault(); f[f.length - 1].focus(); }
+                    else if (!e.shiftKey && document.activeElement === f[f.length - 1]) { e.preventDefault(); f[0].focus(); }
+                    return;
+                }
+                if (e.ctrlKey || e.metaKey || e.altKey) return;
+                const open = state === 'open';
+                if (e.key === ' ' && document.activeElement && /^(BUTTON|SELECT)$/.test(document.activeElement.tagName)) return;
+                const map = {
+                    Escape: () => closeLightbox(),
+                    ' ': () => open && count > 1 && setPlaying(!playing),
+                    ArrowLeft: () => open && showPrev(),
+                    ArrowRight: () => open && showNext(),
+                    Home: () => open && goTo(0, -1),
+                    End: () => open && goTo(count - 1, 1),
+                    '+': () => open && zoomAt(view.z * 1.6, 0, 0, true),
+                    '=': () => open && zoomAt(view.z * 1.6, 0, 0, true),
+                    '-': () => open && zoomAt(view.z / 1.6, 0, 0, true),
+                    '_': () => open && zoomAt(view.z / 1.6, 0, 0, true),
+                    '0': () => open && zoomAt(1, 0, 0, true)
+                };
+                if (map[e.key]) { e.preventDefault(); map[e.key](); }
+            });
+        });
+    </script>
+</body>
+</html>
+
